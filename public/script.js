@@ -300,26 +300,26 @@ function drawWheel(angle) {
       ctx.stroke();
     }
 
-    // Draw labels inside the wedge if it is wide enough (magnified)
-    const labelFontSize = Math.max(6, Math.min(13, sliceWidth * 90));
-    if (labelFontSize >= 8.5) {
-      ctx.save();
-      ctx.translate(center, center);
-      ctx.rotate(startAngle + sliceWidth / 2);
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(labelFontSize)}px Outfit, sans-serif`;
+    // Draw labels inside the wedge
+    ctx.save();
+    ctx.translate(center, center);
+    ctx.rotate(startAngle + sliceWidth / 2);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
 
-      let titleText = currentWheelFilms[i]?.title || '';
-      const maxCharLen = Math.floor(sliceWidth * 160);
-      if (titleText.length > maxCharLen && maxCharLen > 5) {
-        titleText = titleText.substring(0, maxCharLen - 3) + '...';
-      }
+    // Scale font size dynamically. Very compressed slices get a tiny 5.5px font,
+    // and magnified slices near the pointer scale up to 13px.
+    const labelFontSize = Math.max(5.5, Math.min(13, sliceWidth * 95));
+    ctx.font = `bold ${labelFontSize.toFixed(1)}px Outfit, sans-serif`;
 
-      ctx.fillText(titleText, radius - 35, 0);
-      ctx.restore();
+    let titleText = currentWheelFilms[i]?.title || '';
+    if (titleText.length > 25) {
+      titleText = titleText.substring(0, 22) + '...';
     }
+
+    ctx.fillText(titleText, radius - 25, 0);
+    ctx.restore();
 
     currentAngle += sliceWidth;
   }
