@@ -759,6 +759,94 @@ body:not(.light-theme) .theme-icon-dark {
   }
 }
 
+/* ── Rich Modal Metadata Styles ──────────────────────────── */
+
+.original-title-row {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: -0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.meta-separator-wrap {
+  display: inline;
+}
+
+.modal-rating-row {
+  margin-top: 0.5rem;
+}
+
+.modal-rating-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--lb-orange);
+  letter-spacing: 0.02em;
+}
+
+.modal-genres-row {
+  margin-top: 0.5rem;
+}
+
+.modal-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.genre-badge {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(0, 224, 84, 0.12);
+  color: var(--lb-green);
+  border: 1px solid rgba(0, 224, 84, 0.3);
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
+
+body.light-theme .genre-badge {
+  background: rgba(0, 180, 68, 0.1);
+  color: #007a35;
+  border-color: rgba(0, 180, 68, 0.3);
+}
+
+/* Meta table below description */
+.modal-meta-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.modal-meta-row {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+.modal-meta-label {
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 56px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  padding-top: 0.1rem;
+}
+
+.modal-meta-value {
+  color: var(--text-main);
+  flex: 1;
+}
+
 /* Responsive Styling for Mobile */
 @media (max-width: 640px) {
   .app-container {

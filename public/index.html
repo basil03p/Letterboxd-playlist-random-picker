@@ -164,16 +164,45 @@
           <div class="movie-text-wrapper">
             <div class="movie-header">
               <h2 id="movie-title">Movie Title</h2>
+              <p id="modal-original-title-row" class="original-title-row"><em id="modal-original-title"></em></p>
               <div class="movie-meta">
                 <span id="movie-year" class="meta-item">Release Year</span>
                 <span class="meta-separator">•</span>
                 <span id="movie-director" class="meta-item">Director</span>
+                <span id="modal-runtime-row" class="meta-separator-wrap">
+                  <span class="meta-separator">•</span>
+                  <span id="modal-runtime" class="meta-item"></span>
+                </span>
+              </div>
+              <!-- Rating -->
+              <div id="modal-rating-row" class="modal-rating-row">
+                <span id="modal-rating" class="modal-rating-value"></span>
+              </div>
+              <!-- Genre Badges -->
+              <div id="modal-genres-row" class="modal-genres-row">
+                <div id="modal-genres" class="modal-genres"></div>
               </div>
             </div>
             
             <p id="movie-description" class="movie-description">
               Movie description or synopsis parsed from Letterboxd.
             </p>
+
+            <!-- Extra metadata rows -->
+            <div class="modal-meta-table">
+              <div id="modal-cast-row" class="modal-meta-row">
+                <span class="modal-meta-label">Cast</span>
+                <span id="modal-cast" class="modal-meta-value"></span>
+              </div>
+              <div id="modal-country-row" class="modal-meta-row">
+                <span class="modal-meta-label">Country</span>
+                <span id="modal-country" class="modal-meta-value"></span>
+              </div>
+              <div id="modal-studios-row" class="modal-meta-row">
+                <span class="modal-meta-label">Studios</span>
+                <span id="modal-studios" class="modal-meta-value"></span>
+              </div>
+            </div>
 
             <div class="modal-actions">
               <a href="" id="letterboxd-link" target="_blank" class="btn btn-primary">

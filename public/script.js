@@ -489,13 +489,58 @@ async function finishSpin() {
   try {
     const details = await detailsPromise;
     
-    movieTitle.textContent = details.title;
-    movieYear.textContent = details.year || 'N/A';
+    movieTitle.textContent = details.title || winningFilm.title;
+    movieYear.textContent  = details.year || 'N/A';
     movieDirector.textContent = details.directors.length > 0 ? details.directors.join(', ') : 'Unknown';
-    movieDescription.textContent = details.description || 'No description available for this film.';
+    movieDescription.textContent = details.description || 'No description available.';
     letterboxdLink.href = details.link;
-    
     moviePoster.src = details.image || winningFilm.posterUrl || 'https://a.ltrbxd.com/resized/empty-poster-150.png';
+
+    // ── Render extra fields if elements exist ──────────────────
+    const setMeta = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || '';
+    };
+    const showRow = (id, show) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? '' : 'none';
+    };
+
+    // Rating: e.g. "★ 4.09 / 5"
+    if (details.rating) {
+      const stars = '★'.repeat(Math.round(details.rating)) + '☆'.repeat(5 - Math.round(details.rating));
+      setMeta('modal-rating', `${details.rating.toFixed(2)} / 5  ${stars}`);
+      showRow('modal-rating-row', true);
+    } else {
+      showRow('modal-rating-row', false);
+    }
+
+    // Runtime
+    setMeta('modal-runtime', details.runtime || '');
+    showRow('modal-runtime-row', !!details.runtime);
+
+    // Genres as badges
+    const genreEl = document.getElementById('modal-genres');
+    if (genreEl) {
+      genreEl.innerHTML = (details.genres || [])
+        .map(g => `<span class="genre-badge">${g}</span>`).join('');
+      showRow('modal-genres-row', details.genres && details.genres.length > 0);
+    }
+
+    // Cast
+    setMeta('modal-cast', (details.cast || []).join(', '));
+    showRow('modal-cast-row', details.cast && details.cast.length > 0);
+
+    // Country & Studios
+    setMeta('modal-country', (details.countries || []).join(', '));
+    showRow('modal-country-row', details.countries && details.countries.length > 0);
+
+    setMeta('modal-studios', (details.studios || []).join(', '));
+    showRow('modal-studios-row', details.studios && details.studios.length > 0);
+
+    // Original title
+    setMeta('modal-original-title', details.originalTitle || '');
+    showRow('modal-original-title-row', !!details.originalTitle);
 
     modalLoading.classList.add('hidden');
     modalDetails.classList.remove('hidden');

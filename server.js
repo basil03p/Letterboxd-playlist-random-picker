@@ -226,7 +226,7 @@ app.post('/api/list', async (req, res) => {
 /**
  * GET /api/movie-details
  * Query: ?slug=movie-slug
- * Scrapes detailed information for a single movie
+ * Scrapes comprehensive information for a single movie from Letterboxd.
  */
 app.get('/api/movie-details', async (req, res) => {
   const { slug } = req.query;
@@ -242,86 +242,168 @@ app.get('/api/movie-details', async (req, res) => {
     const html = await fetchHtmlViaCurl(movieUrl);
     const $ = cheerio.load(html);
 
+    // Helper: parse ISO 8601 duration string (e.g. "PT2H27M") to "2h 27m"
+    function parseDuration(iso) {
+      if (!iso) return '';
+      const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
+      if (!match) return '';
+      const h = parseInt(match[1] || '0', 10);
+      const m = parseInt(match[2] || '0', 10);
+      if (h && m) return `${h}h ${m}m`;
+      if (h) return `${h}h`;
+      if (m) return `${m}m`;
+      return '';
+    }
+
     let details = {
       title: '',
       year: '',
       directors: [],
+      cast: [],                // top billed actors
       description: '',
-      image: '',
+      image: '',               // poster
+      genres: [],
+      runtime: '',             // e.g. "2h 27m"
+      rating: null,            // e.g. 4.09
+      ratingCount: null,       // e.g. 1188528
+      studios: [],             // production companies
+      countries: [],
+      languages: [],
+      originalTitle: '',
       link: movieUrl
     };
 
-    // Attempt to parse JSON-LD script for clean schema.org metadata
+    // ── Primary: parse JSON-LD schema.org block ───────────────────────────
     const jsonLdScript = $('script[type="application/ld+json"]').html();
-    
     if (jsonLdScript) {
       try {
-        // Strip CDATA comments from the JSON-LD script content
+        // Strip CDATA wrapper and parse
         const cleanedJson = jsonLdScript.replace(/\/\*[\s\S]*?\*\//g, '').trim();
         const parsed = JSON.parse(cleanedJson);
-        const movie = Array.isArray(parsed) ? parsed.find(item => item['@type'] === 'Movie') : parsed;
-        
+        const movie = Array.isArray(parsed)
+          ? parsed.find(item => item['@type'] === 'Movie')
+          : parsed;
+
         if (movie && movie['@type'] === 'Movie') {
-          details.title = movie.name;
-          details.image = movie.image || '';
+          details.title       = movie.name || '';
+          details.image       = movie.image || '';
           details.description = movie.description || '';
-          
+          details.runtime     = parseDuration(movie.duration);
+          details.genres      = Array.isArray(movie.genre) ? movie.genre : (movie.genre ? [movie.genre] : []);
+
+          // Directors
           if (movie.director) {
-            const directorsArr = Array.isArray(movie.director) ? movie.director : [movie.director];
-            details.directors = directorsArr.map(d => d.name).filter(Boolean);
+            const dirs = Array.isArray(movie.director) ? movie.director : [movie.director];
+            details.directors = dirs.map(d => d.name).filter(Boolean);
           }
-          
-          if (movie.releasedEvent) {
+
+          // Cast (actors) — first 10 billed
+          if (movie.actor) {
+            const actors = Array.isArray(movie.actor) ? movie.actor : [movie.actor];
+            details.cast = actors.slice(0, 10).map(a => a.name).filter(Boolean);
+          }
+
+          // Production companies / studios
+          if (movie.productionCompany) {
+            const companies = Array.isArray(movie.productionCompany) ? movie.productionCompany : [movie.productionCompany];
+            details.studios = companies.map(c => c.name).filter(Boolean);
+          }
+
+          // Countries
+          if (movie.countryOfOrigin) {
+            const countries = Array.isArray(movie.countryOfOrigin) ? movie.countryOfOrigin : [movie.countryOfOrigin];
+            details.countries = countries.map(c => c.name).filter(Boolean);
+          }
+
+          // Languages (ISO codes like "de", "en" → use as-is, or map if needed)
+          if (movie.inLanguage) {
+            details.languages = Array.isArray(movie.inLanguage) ? movie.inLanguage : [movie.inLanguage];
+          }
+
+          // Aggregate rating
+          if (movie.aggregateRating) {
+            details.rating      = movie.aggregateRating.ratingValue ?? null;
+            details.ratingCount = movie.aggregateRating.ratingCount ?? null;
+          }
+
+          // Year from dateCreated or releasedEvent
+          if (movie.dateCreated) {
+            details.year = new Date(movie.dateCreated).getFullYear().toString();
+          } else if (movie.releasedEvent) {
             const release = Array.isArray(movie.releasedEvent) ? movie.releasedEvent[0] : movie.releasedEvent;
-            if (release && release.startDate) {
+            if (release?.startDate) {
               details.year = new Date(release.startDate).getFullYear().toString();
             }
-          } else if (movie.dateCreated) {
-            details.year = new Date(movie.dateCreated).getFullYear().toString();
           }
         }
       } catch (e) {
-        console.error('Error parsing JSON-LD script tag:', e.message);
+        console.error('Error parsing JSON-LD:', e.message);
       }
     }
 
-    // Fallbacks if JSON-LD is missing or partially parsed
+    // ── Fallbacks for any missing fields ─────────────────────────────────
+
     if (!details.title) {
-      const ogTitle = $('meta[property="og:title"]').attr('content');
-      if (ogTitle) {
-        const match = ogTitle.match(/^(.*)\s+\((\d{4})\)$/);
-        if (match) {
-          details.title = match[1];
-          details.year = match[2];
-        } else {
-          details.title = ogTitle;
-        }
-      } else {
-        details.title = $('.headline-1, .film-title, h1').first().text().trim() || slug;
-      }
+      const ogTitle = $('meta[property="og:title"]').attr('content') || '';
+      const match = ogTitle.match(/^(.*)\s+\((\d{4})\)$/);
+      if (match) { details.title = match[1]; details.year = match[2]; }
+      else details.title = ogTitle || $('h1.headline-1').first().text().trim() || slug;
     }
-    
+
     if (!details.year) {
-      details.year = $('.releaseyear, .releaseyear a').first().text().trim();
-    }
-    
-    if (details.directors.length === 0) {
-      const parsedDirs = [];
-      $('span.director a, a[href^="/director/"]').each((i, el) => {
-        parsedDirs.push($(el).text().trim());
-      });
-      details.directors = [...new Set(parsedDirs)];
+      details.year = $('.releasedate a, .releaseyear a').first().text().trim();
     }
 
     if (!details.description) {
-      // Scrape storyline synopsis
-      details.description = $('.film-synopsis .truncate, .film-synopsis, .storyline .truncate').first().text().trim();
-      // Remove any trailing "read more" text from truncate toggles
-      details.description = details.description.replace(/\s*…\s*more\s*$/i, '');
+      // og:description is the cleanest fallback
+      details.description = $('meta[property="og:description"]').attr('content')
+        || $('meta[name="description"]').attr('content')
+        || $('.production-synopsis .truncate p').first().text().trim()
+        || '';
+    }
+
+    if (details.directors.length === 0) {
+      const dirs = [];
+      $('span.contributorlist a[href*="/director/"], a[href^="/director/"]').each((i, el) => {
+        dirs.push($(el).text().trim());
+      });
+      details.directors = [...new Set(dirs)];
+    }
+
+    if (details.cast.length === 0) {
+      const actors = [];
+      $('#tab-panel-cast .cast-list a.text-slug').each((i, el) => {
+        if (i < 10) actors.push($(el).text().trim());
+      });
+      details.cast = actors;
     }
 
     if (!details.image) {
-      details.image = $('.image-container img, .poster img').first().attr('src') || '';
+      details.image = $('meta[property="og:image"]').attr('content') || '';
+    }
+
+    if (details.genres.length === 0) {
+      const genres = [];
+      $('#tab-panel-genres .text-sluglist a').each((i, el) => {
+        genres.push($(el).text().trim());
+      });
+      details.genres = genres;
+    }
+
+    // Original title (non-English)
+    details.originalTitle = $('h2.originalname em').first().text().trim() || '';
+
+    // Twitter card director fallback
+    if (details.directors.length === 0) {
+      const twDir = $('meta[name="twitter:data1"]').attr('content');
+      if (twDir) details.directors = [twDir];
+    }
+
+    // Rating from twitter card fallback: "4.09 out of 5"
+    if (!details.rating) {
+      const twRating = $('meta[name="twitter:data2"]').attr('content') || '';
+      const rMatch = twRating.match(/([\d.]+)\s+out\s+of/);
+      if (rMatch) details.rating = parseFloat(rMatch[1]);
     }
 
     res.json(details);
