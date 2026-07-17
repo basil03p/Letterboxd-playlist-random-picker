@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Letterboxd Roulette - Random Playlist Picker</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Canvas Confetti Library for winning pop-up -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header with Letterboxd style three dots -->
+    <header class="header">
+      <div class="logo-dots">
+        <span class="dot orange"></span>
+        <span class="dot green"></span>
+        <span class="dot blue"></span>
+      </div>
+      <h1>Letterboxd Roulette</h1>
+      <p class="subtitle">Enter a list URL, apply filters, and spin to pick a random film.</p>
+    </header>
+
+    <!-- Main Card containing input form and filters -->
+    <main class="main-card">
+      <form id="playlist-form">
+        <div class="input-group">
+          <input 
+            type="url" 
+            id="list-url" 
+            placeholder="https://letterboxd.com/username/list/list-name/" 
+            required
+            autocomplete="off"
+          >
+          <button type="submit" id="submit-btn">Load List</button>
+        </div>
+
+        <!-- Filter Options -->
+        <div class="filters-container">
+          <div class="filter-field">
+            <label for="genre-select">Genre</label>
+            <select id="genre-select">
+              <option value="">All Genres</option>
+              <option value="action">Action</option>
+              <option value="adventure">Adventure</option>
+              <option value="animation">Animation</option>
+              <option value="comedy">Comedy</option>
+              <option value="crime">Crime</option>
+              <option value="documentary">Documentary</option>
+              <option value="drama">Drama</option>
+              <option value="family">Family</option>
+              <option value="fantasy">Fantasy</option>
+              <option value="history">History</option>
+              <option value="horror">Horror</option>
+              <option value="music">Music</option>
+              <option value="mystery">Mystery</option>
+              <option value="romance">Romance</option>
+              <option value="science-fiction">Science Fiction</option>
+              <option value="thriller">Thriller</option>
+              <option value="war">War</option>
+              <option value="western">Western</option>
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="decade-select">Decade</label>
+            <select id="decade-select">
+              <option value="">All Decades</option>
+              <option value="2020s">2020s</option>
+              <option value="2010s">2010s</option>
+              <option value="2000s">2000s</option>
+              <option value="1990s">1990s</option>
+              <option value="1980s">1980s</option>
+              <option value="1970s">1970s</option>
+              <option value="1960s">1960s</option>
+              <option value="1950s">1950s</option>
+              <option value="1940s">1940s</option>
+              <option value="1930s">1930s</option>
+              <option value="1920s">1920s</option>
+              <option value="1910s">1910s</option>
+              <option value="1900s">1900s</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Optional User Info & Watched Filter -->
+        <div class="user-filters-container">
+          <div class="filter-field">
+            <label for="username-input">Letterboxd Username (Optional)</label>
+            <input 
+              type="text" 
+              id="username-input" 
+              placeholder="e.g. username" 
+              autocomplete="off"
+            >
+          </div>
+          <div class="filter-field checkbox-field">
+            <label class="checkbox-label">
+              <input type="checkbox" id="skip-watched-checkbox">
+              <span class="checkbox-custom"></span>
+              Skip watched films
+            </label>
+          </div>
+        </div>
+      </form>
+
+      <!-- Status Indicator -->
+      <div id="status-message" class="status-message hidden"></div>
+      
+      <!-- Loaded Information Banner -->
+      <div id="list-info" class="list-info hidden">
+        <span id="list-count-badge" class="badge">0 Films</span>
+        <span id="active-filters-text">No filters active</span>
+      </div>
+    </main>
+
+    <!-- Roulette Wheel Section -->
+    <section class="wheel-section hidden" id="wheel-section">
+      <div id="wheel-readout" class="wheel-readout">Ready to Spin!</div>
+      <div class="wheel-container">
+        <!-- Arrow pointing at winning wedge -->
+        <div class="wheel-pointer"></div>
+        <!-- Canvas for rendering the roulette slices -->
+        <canvas id="wheel-canvas" width="500" height="500"></canvas>
+        <!-- Center hub button to initiate spin -->
+        <button id="spin-hub-btn">SPIN</button>
+      </div>
+      
+      <div class="wheel-instructions">
+        Click the center <strong>SPIN</strong> button or press the spacebar to choose a movie!
+      </div>
+    </section>
+
+    <!-- Detailed Movie Result Modal -->
+    <div id="result-modal" class="modal hidden">
+      <div class="modal-backdrop" id="modal-close-backdrop"></div>
+      <div class="modal-content glass">
+        <!-- Close Button -->
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+        
+        <!-- Loading State for Film Details -->
+        <div id="modal-loading" class="modal-loading-state">
+          <div class="spinner"></div>
+          <p>Scraping film details from Letterboxd...</p>
+        </div>
+
+        <!-- Movie Details Card -->
+        <div id="modal-details" class="modal-details hidden">
+          <div class="movie-poster-wrapper">
+            <img id="movie-poster" src="" alt="Movie Poster" onerror="this.src='https://a.ltrbxd.com/resized/empty-poster-150.png';">
+          </div>
+          <div class="movie-text-wrapper">
+            <div class="movie-header">
+              <h2 id="movie-title">Movie Title</h2>
+              <div class="movie-meta">
+                <span id="movie-year" class="meta-item">Release Year</span>
+                <span class="meta-separator">•</span>
+                <span id="movie-director" class="meta-item">Director</span>
+              </div>
+            </div>
+            
+            <p id="movie-description" class="movie-description">
+              Movie description or synopsis parsed from Letterboxd.
+            </p>
+
+            <div class="modal-actions">
+              <a href="" id="letterboxd-link" target="_blank" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                Open Letterboxd
+              </a>
+              <button id="spin-again-btn" class="btn btn-secondary">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+                Spin Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Scraping logic inspired by <a href="https://github.com/L-Dot/Letterboxd-list-scraper" target="_blank" class="credit-link">L-Dot's Letterboxd-list-scraper</a>.</p>
+      <p>Made with love for cinema. Not affiliated with Letterboxd.</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
