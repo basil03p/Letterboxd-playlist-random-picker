@@ -176,35 +176,59 @@ playlistForm.addEventListener('submit', async (e) => {
   }
 });
 
-// Helper to find the film directly under the pointer (12 o'clock / 270 degrees)
+// Helper to find the film directly under the pointer (3 o'clock / 0 radians)
 function getFilmUnderPointer(angle) {
   if (currentWheelFilms.length === 0) return null;
   const slices = currentWheelFilms.length;
-  const sliceAngle = (2 * Math.PI) / slices;
-  
-  // 12 o'clock is at 3 * Math.PI / 2
-  let localAngle = (3 * Math.PI / 2 - angle) % (2 * Math.PI);
-  if (localAngle < 0) {
-    localAngle += 2 * Math.PI;
+
+  // The pointer is at 0 radians.
+  // We want to find the wedge `i` that contains the angle `0` (or its equivalent in [angle, angle + 2PI))
+  let ptr = 0;
+  while (ptr < angle) {
+    ptr += 2 * Math.PI;
   }
+  while (ptr >= angle + 2 * Math.PI) {
+    ptr -= 2 * Math.PI;
+  }
+
+  // Find which wedge contains `ptr`
+  // Re-compute the exact wedge widths at this rotation angle
+  const maxMagnification = 12.0;
+  const sigma = 0.35;
   
-  const index = Math.floor(localAngle / sliceAngle) % slices;
-  return currentWheelFilms[index];
+  let weights = [];
+  let totalWeight = 0;
+  for (let i = 0; i < slices; i++) {
+    const nominalLocalAngle = i * (2 * Math.PI) / slices;
+    const screenAngle = (nominalLocalAngle + angle) % (2 * Math.PI);
+    let diff = (screenAngle - 0) % (2 * Math.PI);
+    let dist = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+    if (dist < -Math.PI) dist += 2 * Math.PI;
+    const w = 1.0 + maxMagnification * Math.exp(-(dist * dist) / (2 * sigma * sigma));
+    weights.push(w);
+    totalWeight += w;
+  }
+
+  let accumAngle = angle;
+  for (let i = 0; i < slices; i++) {
+    const w = weights[i];
+    const sliceWidth = (2 * Math.PI) * (w / totalWeight);
+    const nextAngle = accumAngle + sliceWidth;
+    
+    if (ptr >= accumAngle && ptr < nextAngle) {
+      return currentWheelFilms[i];
+    }
+    accumAngle = nextAngle;
+  }
+  return currentWheelFilms[0]; // Fallback
 }
 
-// Setup Wheel with dynamic, readable slices (up to 15)
+// Setup Wheel with all public list films
 function setupWheel() {
   if (filmList.length === 0) return;
   
-  // If list is small, put all of them. Otherwise, grab a sample of 15 to keep text readable
-  const maxSlices = 15;
-  if (filmList.length <= maxSlices) {
-    currentWheelFilms = [...filmList];
-  } else {
-    // Shuffled sample of 15 films
-    const shuffled = [...filmList].sort(() => 0.5 - Math.random());
-    currentWheelFilms = shuffled.slice(0, maxSlices);
-  }
+  // Put ALL films from the loaded list on the wheel
+  currentWheelFilms = [...filmList];
   
   wheelAngle = 0;
   drawWheel(0);
@@ -215,7 +239,7 @@ function setupWheel() {
   }
 }
 
-// Draw the Roulette Wheel Canvas containing readable slices
+// Draw the Roulette Wheel Canvas containing ALL films with a dynamic fisheye lens
 function drawWheel(angle) {
   const width = wheelCanvas.width;
   const height = wheelCanvas.height;
@@ -227,54 +251,80 @@ function drawWheel(angle) {
 
   const slices = currentWheelFilms.length;
   if (slices === 0) return;
-  
-  const sliceAngle = (2 * Math.PI) / slices;
 
-  ctx.save();
-  ctx.translate(center, center);
-  ctx.rotate(angle);
+  // 1. Calculate dynamic magnification weights for all slices
+  // Center of the lens is at 0 radians (3 o'clock pointer)
+  const pointerAngle = 0; 
+  const maxMagnification = 12.0; 
+  const sigma = 0.35; 
 
-  // Draw wedges
+  let weights = [];
+  let totalWeight = 0;
+
   for (let i = 0; i < slices; i++) {
-    const startAngle = i * sliceAngle;
-    const endAngle = startAngle + sliceAngle;
+    const nominalLocalAngle = i * (2 * Math.PI) / slices;
+    const screenAngle = (nominalLocalAngle + angle) % (2 * Math.PI);
+
+    let diff = (screenAngle - pointerAngle) % (2 * Math.PI);
+    let dist = ((diff + Math.PI) % (2 * Math.PI)) - Math.PI;
+    if (dist < -Math.PI) dist += 2 * Math.PI;
+
+    const w = 1.0 + maxMagnification * Math.exp(-(dist * dist) / (2 * sigma * sigma));
+    weights.push(w);
+    totalWeight += w;
+  }
+
+  // 2. Draw each wedge using its normalized width
+  let currentAngle = angle;
+  for (let i = 0; i < slices; i++) {
+    const w = weights[i];
+    const sliceWidth = (2 * Math.PI) * (w / totalWeight);
+    const startAngle = currentAngle;
+    const endAngle = startAngle + sliceWidth;
 
     // Wedge background
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, radius - 10, startAngle, endAngle);
+    ctx.moveTo(center, center);
+    ctx.arc(center, center, radius - 10, startAngle, endAngle);
     ctx.closePath();
     ctx.fillStyle = wedgeColors[i % wedgeColors.length];
     ctx.fill();
 
     // Divider line
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo((radius - 10) * Math.cos(startAngle), (radius - 10) * Math.sin(startAngle));
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Draw labels inside slices (since slices are always <= 15)
-    ctx.save();
-    ctx.rotate(startAngle + sliceAngle / 2);
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Outfit, sans-serif';
-
-    let titleText = currentWheelFilms[i]?.title || '';
-    if (titleText.length > 22) {
-      titleText = titleText.substring(0, 20) + '...';
+    if (slices <= 250 || sliceWidth > 0.02) {
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.lineTo(center + (radius - 10) * Math.cos(startAngle), center + (radius - 10) * Math.sin(startAngle));
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = slices > 100 ? 0.5 : 1.5;
+      ctx.stroke();
     }
 
-    ctx.fillText(titleText, radius - 35, 0);
-    ctx.restore();
+    // Draw labels inside the wedge if it is wide enough (magnified)
+    const labelFontSize = Math.max(6, Math.min(13, sliceWidth * 90));
+    if (labelFontSize >= 8.5) {
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(startAngle + sliceWidth / 2);
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.round(labelFontSize)}px Outfit, sans-serif`;
+
+      let titleText = currentWheelFilms[i]?.title || '';
+      const maxCharLen = Math.floor(sliceWidth * 160);
+      if (titleText.length > maxCharLen && maxCharLen > 5) {
+        titleText = titleText.substring(0, maxCharLen - 3) + '...';
+      }
+
+      ctx.fillText(titleText, radius - 35, 0);
+      ctx.restore();
+    }
+
+    currentAngle += sliceWidth;
   }
 
-  ctx.restore();
-
-  // Draw outer glowing ring overlay
+  // 3. Draw outer glowing ring overlay
   ctx.beginPath();
   ctx.arc(center, center, radius - 5, 0, 2 * Math.PI);
   ctx.strokeStyle = '#2c3440';
@@ -293,11 +343,11 @@ function drawWheel(angle) {
 
   // Center cap inner hub
   ctx.beginPath();
-  ctx.arc(center, center, 42, 0, 2 * Math.PI);
-  ctx.fillStyle = '#1c252d';
+  ctx.arc(center, center, 52, 0, 2 * Math.PI);
+  ctx.fillStyle = '#14181c';
   ctx.fill();
   ctx.strokeStyle = '#2c3440';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
   ctx.stroke();
 }
 
@@ -319,7 +369,6 @@ async function spinWheel() {
   // 2. Find or place the winning film in our wheel list
   winningSliceIndex = currentWheelFilms.findIndex(f => f.slug === winningFilm.slug);
   if (winningSliceIndex === -1) {
-    // Replace a random slice with the winning film
     winningSliceIndex = Math.floor(Math.random() * currentWheelFilms.length);
     currentWheelFilms[winningSliceIndex] = winningFilm;
   }
@@ -327,13 +376,14 @@ async function spinWheel() {
   // 3. Pre-fetch movie details in background during spin
   fetchMovieDetails(winningFilm.slug);
 
-  // 4. Calculate target rotation
+  // 4. Calculate target rotation (Pointer is at 3 o'clock / 0 radians)
   const slices = currentWheelFilms.length;
-  const sliceWidth = (2 * Math.PI) / slices;
-  const targetPointerAngle = 3 * Math.PI / 2; // 12 o'clock pointer
-  const sliceCenterAngle = (winningSliceIndex * sliceWidth) + (sliceWidth / 2);
+  const sliceAngle = (2 * Math.PI) / slices;
+  const sliceCenterAngle = (winningSliceIndex * sliceAngle) + (sliceAngle / 2);
   
-  let finalAngle = targetPointerAngle - sliceCenterAngle;
+  // To center the winning slice exactly at 0 screen radians:
+  // (sliceCenterAngle + finalAngle) = 0 (modulo 2PI)
+  let finalAngle = -sliceCenterAngle;
   while (finalAngle < 0) {
     finalAngle += 2 * Math.PI;
   }
