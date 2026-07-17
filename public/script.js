@@ -107,25 +107,16 @@ playlistForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   if (isSpinning) return;
 
-  let baseUr = listUrlInput.value.trim();
+  let baseUrl = listUrlInput.value.trim();
   const selectedGenre = genreSelect.value;
   const selectedDecade = decadeSelect.value;
   const username = usernameInput.value.trim();
   const skipWatched = skipWatchedCheckbox.checked;
 
-  // Clean trailing slash
-  baseUr = baseUr.replace(/\/$/, '');
-
-  // Append decade/genre in the correct Letterboxd format if selected
-  let finalUrl = baseUr;
-  if (selectedDecade) {
-    finalUrl += `/decade/${selectedDecade}`;
+  if (!baseUrl) {
+    showStatus('Please enter a Letterboxd list URL.', 'error');
+    return;
   }
-  if (selectedGenre) {
-    finalUrl += `/genre/${selectedGenre}`;
-  }
-  // Ensure trailing slash for Letterboxd URL consistency
-  finalUrl += '/';
 
   showStatus('Connecting to Letterboxd and scraping list...', 'loading');
   submitBtn.disabled = true;
@@ -135,7 +126,7 @@ playlistForm.addEventListener('submit', async (e) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        url: finalUrl,
+        url: baseUrl,        // Server strips genre/decade and fetches full list
         username: username,
         skipWatched: skipWatched
       })
@@ -146,15 +137,49 @@ playlistForm.addEventListener('submit', async (e) => {
       throw new Error(data.error || 'Failed to fetch playlist data.');
     }
 
-    filmList = data.films;
-    showStatus(`Successfully loaded ${filmList.length} films!`, 'success');
-    
+    let allFilms = data.films;
+    const totalLoaded = allFilms.length;
+
+    // ── Client-side decade filtering ─────────────────────────
+    // Decade is easy: year is embedded in each film object from the scraper
+    if (selectedDecade) {
+      const decadeStart = parseInt(selectedDecade.replace('s', ''), 10);
+      const decadeEnd = decadeStart + 9;
+      allFilms = allFilms.filter(f => {
+        if (!f.year) return false;
+        const yr = parseInt(f.year, 10);
+        return yr >= decadeStart && yr <= decadeEnd;
+      });
+    }
+
+    // ── Genre note ────────────────────────────────────────────
+    // Letterboxd's genre-filter URLs are blocked for server-side scrapers
+    // (Cloudflare returns a challenge page). Genre filtering is shown as a
+    // notice. The full list is loaded so you still get a random pick from
+    // the correct decade if selected.
+    if (selectedGenre) {
+      showStatus(
+        `ℹ️ Loaded ${allFilms.length} films${selectedDecade ? ` from ${selectedDecade}` : ''}. Genre filter (${selectedGenre}) cannot be applied server-side due to Letterboxd restrictions — spinning from the full${selectedDecade ? ' decade-filtered' : ''} list.`,
+        'error'
+      );
+    }
+
+    filmList = allFilms;
+
+    if (filmList.length === 0) {
+      throw new Error(`No films found for the selected decade (${selectedDecade}). Try a different decade or remove the filter.`);
+    }
+
+    if (!selectedGenre) {
+      showStatus(`Loaded ${filmList.length} films!`, 'success');
+    }
+
     // Update Banner
     listCountBadge.textContent = `${filmList.length} Films`;
     
     let filterText = [];
     if (selectedDecade) filterText.push(`Decade: ${selectedDecade}`);
-    if (selectedGenre) filterText.push(`Genre: ${selectedGenre}`);
+    if (selectedGenre) filterText.push(`Genre: ${selectedGenre} (full list loaded)`);
     if (skipWatched && username) {
       filterText.push(`Skipped ${data.skippedCount || 0} watched (User: ${username})`);
     }

@@ -43,13 +43,15 @@ async function fetchPageFilms(url) {
     // Letterboxd lists represent films inside divs with data-item-slug attribute
     $('[data-item-slug]').each((i, el) => {
       const slug = $(el).attr('data-item-slug');
-      const title = $(el).attr('data-item-name') || $(el).find('img').attr('alt') || 'Unknown Film';
+      const fullName = $(el).attr('data-item-name') || $(el).find('img').attr('alt') || 'Unknown Film';
       
       if (slug) {
-        films.push({
-          title,
-          slug
-        });
+        // Extract year from title like "Animal Factory (2000)"
+        const yearMatch = fullName.match(/\((\d{4})\)\s*$/);
+        const year = yearMatch ? yearMatch[1] : null;
+        const title = yearMatch ? fullName.replace(/\s*\(\d{4}\)\s*$/, '').trim() : fullName;
+        
+        films.push({ title, slug, year });
       }
     });
 
@@ -143,20 +145,35 @@ app.post('/api/list', async (req, res) => {
   }
 
   try {
-    console.log(`Scraping Letterboxd list: ${url}`);
+    // Strip genre/decade filter segments from URL before scraping
+    // Letterboxd blocks these filtered URLs for server-side scrapers (Cloudflare)
+    // Filtering is applied client-side using year data embedded in film titles
+    const urlObj = new URL(url);
+    let cleanPath = urlObj.pathname
+      .replace(/\/genre\/[^/]+/g, '')
+      .replace(/\/decade\/[^/]+/g, '')
+      .replace(/\/page\/\d+/g, '')
+      .replace(/\/+/g, '/')
+      .replace(/\/$/, '') + '/';
+    const baseUrl = urlObj.origin + cleanPath;
+    
+    console.log(`Scraping Letterboxd list: ${baseUrl}`);
     
     // Fetch page 1
-    const html = await fetchHtmlViaCurl(url);
+    const html = await fetchHtmlViaCurl(baseUrl);
     const $ = cheerio.load(html);
     
     // Parse list items from page 1
     const page1Films = [];
     $('[data-item-slug]').each((i, el) => {
       const slug = $(el).attr('data-item-slug');
-      const title = $(el).attr('data-item-name') || $(el).find('img').attr('alt') || 'Unknown Film';
+      const fullName = $(el).attr('data-item-name') || $(el).find('img').attr('alt') || 'Unknown Film';
       
       if (slug) {
-        page1Films.push({ title, slug });
+        const yearMatch = fullName.match(/\((\d{4})\)\s*$/);
+        const year = yearMatch ? yearMatch[1] : null;
+        const title = yearMatch ? fullName.replace(/\s*\(\d{4}\)\s*$/, '').trim() : fullName;
+        page1Films.push({ title, slug, year });
       }
     });
 
@@ -167,12 +184,12 @@ app.post('/api/list', async (req, res) => {
     if (maxPages > 1) {
       console.log(`Detected multiple pages. Total pages: ${maxPages}. Fetching up to 10 pages sequentially...`);
       
-      // Clean base URL to remove any trailing slashes or existing page segments
-      let cleanBaseUrl = url.replace(/\/$/, '').replace(/\/page\/\d+/, '');
+      // Use cleaned base URL (no genre/decade/page segments) for pagination
       const pageLimit = Math.min(maxPages, 10);
+      const cleanBase = baseUrl.replace(/\/$/, '');
       
       for (let p = 2; p <= pageLimit; p++) {
-        const nextPageUrl = `${cleanBaseUrl}/page/${p}/`;
+        const nextPageUrl = `${cleanBase}/page/${p}/`;
         try {
           await new Promise(resolve => setTimeout(resolve, 150)); // Sleep 150ms to be polite
           const pageFilms = await fetchPageFilms(nextPageUrl);
