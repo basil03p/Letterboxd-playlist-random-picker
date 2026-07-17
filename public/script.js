@@ -302,15 +302,15 @@ function drawWheel(angle) {
       ctx.stroke();
     }
 
-    // Draw labels inside the wedge (black text, high-res DPI adjustments)
+    // Draw labels inside the wedge — white text, fully dynamic sizing
     ctx.save();
     ctx.translate(center, center);
     ctx.rotate(startAngle + sliceWidth / 2);
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#000000'; // Black text to match the user's screenshot layout!
+    ctx.fillStyle = '#ffffff'; // White text — readable on all colorful wedges
 
-    // Double font size range to fit the 1000px high-res canvas (11px to 26px)
+    // Scale font size dynamically based on wedge width and canvas resolution
     const labelFontSize = Math.max(10.5, Math.min(26, sliceWidth * 190));
     ctx.font = `bold ${labelFontSize.toFixed(1)}px Outfit, sans-serif`;
 
@@ -534,3 +534,25 @@ window.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// ── Theme Toggle ──────────────────────────────────────────────
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
+function applyTheme(theme) {
+  if (theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+}
+
+// Dark mode is the default; restore saved preference if any
+const savedTheme = localStorage.getItem('lbr-theme') || 'dark';
+applyTheme(savedTheme);
+
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light-theme');
+    localStorage.setItem('lbr-theme', isLight ? 'light' : 'dark');
+  });
+}

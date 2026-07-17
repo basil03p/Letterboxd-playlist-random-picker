@@ -1,5 +1,6 @@
 /* CSS Reset & Variables */
 :root {
+  /* Dark Theme variables (default) */
   --bg-color: #14181c;
   --card-bg: #1c252d;
   --border-color: #2c3440;
@@ -22,6 +23,16 @@
   --transition-slow: 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Light Theme variables override */
+body.light-theme {
+  --bg-color: #f4f6f7;
+  --card-bg: #ffffff;
+  --border-color: #d8e0e8;
+  --text-muted: #677b8c;
+  --text-main: #2c3440;
+  --text-white: #14181c;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -40,6 +51,7 @@ body {
   justify-content: center;
   align-items: center;
   overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* App Container */
@@ -58,12 +70,64 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.header-top-row {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.theme-toggle-btn {
+  position: absolute;
+  right: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.25rem;
+  color: var(--text-white);
+  transition: var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.08);
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+body.light-theme .theme-toggle-btn {
+  background: rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+body.light-theme .theme-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+/* Toggle Sun/Moon visibility depending on body theme */
+body.light-theme .theme-icon-light {
+  display: none;
+}
+body:not(.light-theme) .theme-icon-dark {
+  display: none;
+}
+
 .logo-dots {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
 }
 
 .logo-dots .dot {

@@ -332,8 +332,8 @@ app.get('/api/movie-details', async (req, res) => {
   }
 });
 
-// Start Express server locally if run directly
-if (process.env.NODE_ENV !== 'production' && require.main === module) {
+// Start Express server when run directly (local dev AND Render/production)
+if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Letterboxd Roulette server running on http://localhost:${PORT}`);
   });
