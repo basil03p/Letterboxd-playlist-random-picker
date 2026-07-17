@@ -193,7 +193,8 @@ function getFilmUnderPointer(angle) {
 
   // Find which wedge contains `ptr`
   // Re-compute the exact wedge widths at this rotation angle
-  const maxMagnification = 12.0;
+  // Dynamic magnification based on number of slices
+  const maxMagnification = Math.min(35, Math.max(8, slices / 12));
   const sigma = 0.35;
   
   let weights = [];
@@ -255,7 +256,8 @@ function drawWheel(angle) {
   // 1. Calculate dynamic magnification weights for all slices
   // Center of the lens is at 0 radians (3 o'clock pointer)
   const pointerAngle = 0; 
-  const maxMagnification = 12.0; 
+  // Dynamic magnification based on number of slices
+  const maxMagnification = Math.min(35, Math.max(8, slices / 12));
   const sigma = 0.35; 
 
   let weights = [];
@@ -300,17 +302,16 @@ function drawWheel(angle) {
       ctx.stroke();
     }
 
-    // Draw labels inside the wedge
+    // Draw labels inside the wedge (black text, high-res DPI adjustments)
     ctx.save();
     ctx.translate(center, center);
     ctx.rotate(startAngle + sliceWidth / 2);
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#000000'; // Black text to match the user's screenshot layout!
 
-    // Scale font size dynamically. Very compressed slices get a tiny 5.5px font,
-    // and magnified slices near the pointer scale up to 13px.
-    const labelFontSize = Math.max(5.5, Math.min(13, sliceWidth * 95));
+    // Double font size range to fit the 1000px high-res canvas (11px to 26px)
+    const labelFontSize = Math.max(10.5, Math.min(26, sliceWidth * 190));
     ctx.font = `bold ${labelFontSize.toFixed(1)}px Outfit, sans-serif`;
 
     let titleText = currentWheelFilms[i]?.title || '';
@@ -318,7 +319,7 @@ function drawWheel(angle) {
       titleText = titleText.substring(0, 22) + '...';
     }
 
-    ctx.fillText(titleText, radius - 25, 0);
+    ctx.fillText(titleText, radius - 50, 0);
     ctx.restore();
 
     currentAngle += sliceWidth;
